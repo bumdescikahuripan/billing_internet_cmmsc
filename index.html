@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUMDes Cikahuripan | Master System v3.0</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+    
+    <style>
+        /* TAMPILAN LAYAR */
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
+        .sidebar { width: 260px; height: 100vh; position: fixed; background: #1a252f; color: white; padding-top: 20px; z-index: 1000; }
+        .content { margin-left: 260px; padding: 30px; }
+        .nav-link { color: #adb5bd; cursor: pointer; padding: 12px 20px; display: block; text-decoration: none; border-left: 4px solid transparent; }
+        .nav-link:hover, .nav-link.active { background: #2c3e50; color: #3498db; border-left: 4px solid #3498db; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .menu-section { display: none; }
+        .active-section { display: block; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* KASIR & STRUK THERMAL (FIX 1 HALAMAN) */
+        #printableReceipt { display: none; }
+
+        @media print {
+            body * { visibility: hidden !important; }
+            #printableReceipt, #printableReceipt * { visibility: visible !important; }
+            #printableReceipt { 
+                display: block !important; 
+                position: absolute !important; 
+                left: 0 !important; 
+                top: 0 !important; 
+                width: 58mm !important; 
+                padding: 0 !important;
+                margin: 0 !important;
+                background: white !important;
+            }
+            @page { size: 58mm auto; margin: 0mm !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="text-center mb-4 px-3">
+        <img src="https://i.ibb.co.com/yFmswV1D/logo-bumdes.png" style="width: 50px;" class="mb-2">
+        <h5 class="fw-bold text-white">BUMDes CIKAHURIPAN</h5>
+        <small class="text-info">Internet Management</small>
+    </div>
+    <nav>
+        <a class="nav-link active" onclick="showSection('dashboard', this)"><i class="fas fa-th-large me-2"></i> Dashboard</a>
+        <a class="nav-link" onclick="showSection('pelanggan', this)"><i class="fas fa-users me-2"></i> Data Pelanggan</a>
+        <a class="nav-link" onclick="showSection('tagihan', this)"><i class="fas fa-cash-register me-2 text-info"></i> Kasir Pembayaran</a>
+        <a class="nav-link" onclick="showSection('pengeluaran', this)"><i class="fas fa-minus-circle me-2 text-warning"></i> Pengeluaran</a>
+        <a class="nav-link" onclick="showSection('piutang', this)"><i class="fas fa-exclamation-triangle me-2 text-danger"></i> Laporan Piutang</a>
+    </nav>
+</div>
+
+<div class="content">
+    <div id="dashboard" class="menu-section active-section">
+        <h3 class="mb-4">Monitor Keuangan</h3>
+        <div class="row g-4 mb-4">
+            <div class="col-md-3"><div class="card p-3 bg-primary text-white text-center"><h6>Kas Internet</h6><h4 id="dash-kas-int">Rp 0</h4></div></div>
+            <div class="col-md-3"><div class="card p-3 bg-success text-white text-center"><h6>Kas BRI</h6><h4 id="dash-kas-bri">Rp 0</h4></div></div>
+            <div class="col-md-3"><div class="card p-3 bg-info text-white text-center"><h6>Kas Dana BUMDes</h6><h4 id="dash-kas-dana">Rp 0</h4></div></div>
+            <div class="col-md-3"><div class="card p-3 bg-danger text-white text-center"><h6>Total Keluar</h6><h4 id="dash-total-keluar">Rp 0</h4></div></div>
+        </div>
+        <div class="row">
+            <div class="col-md-8"><div class="card p-4"><h5>Grafik Pemasukan Bulanan</h5><canvas id="pemasukanChart" height="100"></canvas></div></div>
+            <div class="col-md-4"><div class="card p-4"><h5>Pengeluaran Terakhir</h5><ul id="list-pengeluaran" class="list-group list-group-flush small"></ul></div></div>
+        </div>
+    </div>
+
+    <div id="pelanggan" class="menu-section">
+        <div class="d-flex justify-content-between mb-3">
+            <h3>Database Pelanggan</h3>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalTambah">Pelanggan Baru</button>
+        </div>
+        <div class="card p-3"><table id="tablePelanggan" class="table table-hover w-100"><thead class="table-dark"><tr><th>ID</th><th>Nama</th><th>No. HP</th><th>Paket</th><th>Status</th><th>Harga</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div id="tagihan" class="menu-section">
+        <div class="d-flex justify-content-between mb-3"><h3>Kasir Pembayaran</h3><button class="btn btn-danger" onclick="generateManual()">Tarik Tagihan</button></div>
+        <div class="card p-3"><table id="tableTagihan" class="table table-hover w-100"><thead><tr><th>Inv</th><th>Nama</th><th>Bulan</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div id="pengeluaran" class="menu-section">
+        <div class="d-flex justify-content-between mb-3"><h3>Pencatatan Biaya</h3><button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalPengeluaran">Input Biaya</button></div>
+        <div class="card p-3"><table id="tablePengeluaran" class="table table-hover w-100"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Keterangan</th><th>Jumlah</th><th>Kas</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div id="piutang" class="menu-section">
+        <h3>Laporan Piutang</h3>
+        <div class="card p-3"><table id="tablePiutang" class="table table-bordered w-100"><thead class="table-danger"><tr><th>Nama</th><th>Bulan</th><th>Jumlah</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+    </div>
+</div>
+
+<div id="printableReceipt">
+    <div style="text-align: center; margin-bottom: 5px; padding-top: 5px;">
+        <img src="https://i.ibb.co.com/yFmswV1D/logo-bumdes.png" style="width: 35px;"><br>
+        <strong style="font-size: 10pt;">BUMDes CIKAHURIPAN</strong><br>
+        <small>Unit Layanan Internet</small><br>
+        <span>============================</span>
+    </div>
+    <div style="font-size: 8pt; padding: 0 5px;">
+        Tgl: <span id="r-tgl"></span><br>
+        Inv: <span id="r-inv"></span><br>
+        Nama: <span id="r-nama"></span><br>
+        Kas: <span id="r-kas"></span><br>
+        <span>----------------------------</span>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 9pt;">
+            <span>TOTAL:</span><span id="r-tagihan"></span>
+        </div>
+        <span>----------------------------</span>
+    </div>
+    <div style="text-align: center; margin-top: 5px; padding-bottom: 10px;">
+        <strong>*** LUNAS ***</strong><br><small>Terima Kasih</small>
+    </div>
+</div>
+
+<div class="modal fade" id="modalBayar" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-success text-white"><h5>Proses Bayar</h5></div><div class="modal-body text-center"><h6 id="pay-inv"></h6><h3 id="pay-nama"></h3><h2 id="pay-total" class="text-success"></h2><hr><select id="pay-kas" class="form-select mb-3"><option>Kas Unit Internet</option><option>Kas Bank BRI</option><option>Kas Akun Dana Bumdes</option></select><button class="btn btn-success w-100" onclick="confirmBayar()">Simpan & Cetak</button></div></div></div></div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<div class="modal fade" id="modalTambah" tabindex="-1">
+
+    <div class="modal-dialog">
+        <form id="formTambah" class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Input Pelanggan Baru</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label>ID Pelanggan</label><input type="text" id="add-id" class="form-control" placeholder="Contoh: CIK001" required></div>
+                    <div class="col-md-6 mb-3"><label>No. HP (WhatsApp)</label><input type="text" id="add-hp" class="form-control" placeholder="08xxx" required></div>
+                </div>
+                <div class="mb-3"><label>Nama Lengkap</label><input type="text" id="add-nama" class="form-control" required></div>
+                <div class="mb-3"><label>Alamat</label><input type="text" id="add-alamat" class="form-control" required></div>
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label>Harga Bulanan</label><input type="number" id="add-harga" class="form-control" required></div>
+                    <div class="col-md-6 mb-3"><label>Tanggal Pasang</label><input type="date" id="add-tgl" class="form-control" required></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label>Paket</label>
+                        <select id="add-paket" class="form-select">
+                            <option>10 Mbps</option>
+                            <option>20 Mbps</option>
+                            <option>30 Mbps</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3"><label>Status</label>
+                        <select id="add-status" class="form-select">
+                            <option>Aktif</option>
+                            <option>Non-Aktif</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary w-100">Simpan Pelanggan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPengeluaran" tabindex="-1">
+    <div class="modal-dialog">
+        <form id="formKeluar" class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">Catat Pengeluaran Kas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label>Kategori</label>
+                    <select id="out-kat" class="form-select">
+                        <option>Bandwidth (Pusat)</option>
+                        <option>Gaji Karyawan</option>
+                        <option>Perbaikan Alat</option>
+                        <option>Listrik & Operasional</option>
+                        <option>Lainnya</option>
+                    </select>
+                </div>
+                <div class="mb-3"><label>Jumlah (Rp)</label><input type="number" id="out-jml" class="form-control" required></div>
+                <div class="mb-3"><label>Keterangan</label><input type="text" id="out-ket" class="form-control" placeholder="Contoh: Beli Kabel 1 Roll" required></div>
+                <div class="mb-3">
+                    <label>Sumber Kas</label>
+                    <select id="out-kas" class="form-select">
+                        <option>Kas Unit Internet</option>
+                        <option>Kas Bank BRI</option>
+                        <option>Kas Akun Dana Bumdes</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-warning w-100">Simpan Pengeluaran</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbw2cL_kv7F1zf7MulTLR2f2QepHTzwrOyzH5UT0JBRFHeshM26ZjplmbTOa6dRcsxo/exec"; 
+    let myChart;
+    let tempPayData = {};
+
+    function showSection(id, el) {
+        $('.menu-section').removeClass('active-section');
+        $('#' + id).addClass('active-section');
+        $('.nav-link').removeClass('active');
+        $(el).addClass('active');
+    }
+
+    $(document).ready(function() {
+        $('#tablePelanggan, #tableTagihan, #tablePengeluaran, #tablePiutang').DataTable();
+        loadAllData();
+    });
+
+    function loadAllData() {
+        // Dashboard Saldo
+        fetch(API_URL + "?action=getDashboardData").then(res => res.json()).then(res => {
+            $('#dash-kas-int').text("Rp " + res.saldo.internet.toLocaleString());
+            $('#dash-kas-bri').text("Rp " + res.saldo.bri.toLocaleString());
+            $('#dash-kas-dana').text("Rp " + res.saldo.dana.toLocaleString());
+            renderChart(res.grafik);
+        });
+
+        // Pengeluaran & Total Keluar (Fix REALTIME)
+        fetch(API_URL + "?action=getPengeluaran").then(res => res.json()).then(data => {
+            const t = $('#tablePengeluaran').DataTable(); t.clear();
+            const list = $('#list-pengeluaran').empty();
+            let total = 0;
+            data.forEach((i, idx) => {
+                let jml = parseFloat(i.Jumlah) || 0;
+                total += jml;
+                t.row.add([new Date(i.Tanggal).toLocaleDateString('id-ID'), i.Kategori, i.Keterangan, "Rp "+jml.toLocaleString(), i.Metode_Kas]);
+            });
+            $('#dash-total-keluar').text("Rp " + total.toLocaleString());
+            data.slice(-3).reverse().forEach(i => {
+                list.append(`<li class="list-group-item d-flex justify-content-between align-items-center"><div><b>${i.Keterangan}</b></div><span class="text-danger">-Rp ${parseFloat(i.Jumlah).toLocaleString()}</span></li>`);
+            });
+            t.draw();
+        });
+
+        // Pelanggan (Fix NO_HP)
+        fetch(API_URL + "?action=getPelanggan").then(res => res.json()).then(data => {
+            const t = $('#tablePelanggan').DataTable(); t.clear();
+            data.forEach(i => { t.row.add([i.ID, i.Nama, i.NO_HP, i.Paket, i.Status, "Rp "+(i.Harga||0).toLocaleString()]); });
+            t.draw();
+        });
+
+        // Tagihan
+        fetch(API_URL + "?action=getTagihan").then(res => res.json()).then(data => {
+            const tTag = $('#tableTagihan').DataTable(); tTag.clear();
+            const tPiu = $('#tablePiutang').DataTable(); tPiu.clear();
+            data.forEach(i => {
+                let jml = "Rp " + (i.Jumlah || 0).toLocaleString();
+                if(i.Status == 'Belum Bayar') {
+                    tTag.row.add([i.No_Invoice, i.Nama, i.Bulan, jml, `<span class='badge bg-warning'>Belum Bayar</span>`, `<button onclick="openModalBayar('${i.No_Invoice}','${i.Nama}',${i.Jumlah})" class='btn btn-sm btn-success'>Bayar</button>`]);
+                    tPiu.row.add([i.Nama, i.Bulan, jml, `<span class='badge bg-danger'>Piutang</span>`]);
+                } else {
+                    tTag.row.add([i.No_Invoice, i.Nama, i.Bulan, jml, `<span class='badge bg-success'>Lunas</span>`, `<i class='fa fa-check text-success'></i>`]);
+                }
+            });
+            tTag.draw(); tPiu.draw();
+        });
+    }
+
+    function renderChart(dataGrafik) {
+        const ctx = document.getElementById('pemasukanChart').getContext('2d');
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, { type: 'line', data: { labels: ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'], datasets: [{ label: 'Pemasukan', data: dataGrafik, borderColor: '#3498db', fill: true, tension: 0.3 }] } });
+    }
+
+    function openModalBayar(inv, nama, jml) {
+        tempPayData = { inv, nama, jml };
+        $('#pay-inv').text(inv); $('#pay-nama').text(nama); $('#pay-total').text("Rp " + jml.toLocaleString());
+        $('#modalBayar').modal('show');
+    }
+
+    function confirmBayar() {
+        const kas = $('#pay-kas').val();
+        fetch(API_URL, { method: "POST", body: JSON.stringify({ target: "Bayar", inv: tempPayData.inv, kas: kas }) })
+        .then(() => {
+            $('#r-nama').text(tempPayData.nama); $('#r-inv').text(tempPayData.inv); $('#r-tagihan').text("Rp "+tempPayData.jml.toLocaleString()); 
+            $('#r-kas').text(kas); $('#r-tgl').text(new Date().toLocaleDateString('id-ID'));
+            window.print(); location.reload();
+        });
+    }
+    // Fungsi Kirim Tambah Pelanggan
+$('#formTambah').on('submit', function(e) {
+    e.preventDefault();
+    const btn = $(this).find('button[type="submit"]');
+    btn.prop('disabled', true).text('Menyimpan...');
+
+    const data = {
+        target: "Pelanggan",
+        id: $('#add-id').val(),
+        nama: $('#add-nama').val(),
+        alamat: $('#add-alamat').val(),
+        hp: $('#add-hp').val(),
+        paket: $('#add-paket').val(),
+        status: $('#add-status').val(),
+        harga: $('#add-harga').val(),
+        tgl: $('#add-tgl').val()
+    };
+
+    fetch(API_URL, { method: "POST", body: JSON.stringify(data) })
+    .then(() => { alert("Pelanggan Berhasil Ditambahkan!"); location.reload(); });
+});
+
+// Fungsi Kirim Input Pengeluaran
+$('#formKeluar').on('submit', function(e) {
+    e.preventDefault();
+    const btn = $(this).find('button[type="submit"]');
+    btn.prop('disabled', true).text('Menyimpan...');
+
+    const data = {
+        target: "Pengeluaran",
+        kategori: $('#out-kat').val(),
+        jumlah: $('#out-jml').val(),
+        keterangan: $('#out-ket').val(),
+        kas: $('#out-kas').val()
+    };
+
+    fetch(API_URL, { method: "POST", body: JSON.stringify(data) })
+    .then(() => { alert("Pengeluaran Berhasil Dicatat!"); location.reload(); });
+});
+</script>
+</body>
+</html>
