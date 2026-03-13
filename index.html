@@ -155,7 +155,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzRd2ZGb65lx_PvbihlhxxNBubapwWH6DVM_dFeqCsAgqa1M-3k2bfge25fjxSYVy5g/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbyTGX1egKEA9oAqkBZ5SpXjv7-u4Vz9ZzHMqiIMwZLxkfcbS6mlgXwFSsKb693t0mdh/exec"; 
     const USERNAME = "admin"; const PASSWORD = "bumdes2026";
     let myChart, tempPayData = {}, rawPelanggan = [];
 
@@ -248,18 +248,26 @@
 
     function resetForm() { $('#formTambah')[0].reset(); $('#edit-old-id').val(''); $('#modalTitle').text("Tambah Pelanggan Baru"); }
 
-    function deleteData(id) {
-  if (confirm("Apakah Anda yakin ingin menghapus pelanggan dengan ID: " + id + "?")) {
-    google.script.run
-      .withSuccessHandler(function(res) {
-        alert(res);
-        // Panggil fungsi refresh tabel kamu di sini, misal: loadDataPelanggan();
-      })
-      .withFailureHandler(function(err) {
-        alert("Gagal: " + err.message);
-      })
-      .hapusPelanggan(id);
-  }
+   function hapusPelanggan(id) {
+    if (confirm("Apakah Anda yakin ingin menghapus pelanggan dengan ID: " + id + "?")) {
+        // Tampilkan loading sederhana jika perlu
+        console.log("Menghapus ID:", id);
+
+        fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify({
+                target: "HapusPelanggan",
+                id: id
+            })
+        })
+        .then(res => {
+            alert("Data Berhasil Dihapus");
+            location.reload(); // Refresh halaman untuk memperbarui tabel
+        })
+        .catch(err => {
+            alert("Gagal menghapus data: " + err);
+        });
+    }
 }
 
     $('#formTambah').on('submit', function(e) {
